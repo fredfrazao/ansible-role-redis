@@ -1,0 +1,13 @@
+[Unit]
+Description=Redis Data Store
+After=network.target
+
+[Service]
+User=redis
+Group=redis
+ExecStart={{  redispath  }}/redis-{{  redis_version  }}/bin/redis-server {{  redisconfigpath  }}/redis.conf
+ExecStop={{  redispath  }}/redis-{{  redis_version  }}/bin/redis-server shutdown
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

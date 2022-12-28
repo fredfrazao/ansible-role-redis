@@ -1,0 +1,156 @@
+---
+# # This Playbook runs all the common plays in the deployment
+- name: Install jq needed to work with json content
+  yum:
+    name: jq
+
+- name: Get Secret for AuthPassword for Redis 
+  shell: curl --header X-Vault-Token:{{ vault_token }} {{ vault_source }}{{ vault_path }}{{ env }} | jq '.data.data."redis_password"' | awk '{gsub(/\\n/,"\n")}1'
+  register: AuthPassword
+
+  #make sure  redis config files are replaced on reconfigure 
+- name: Remove file (delete file) - '{{  redisconfigpath  }}/redis.conf' 
+  file:
+    path: '{{  redisconfigpath  }}/redis.conf'
+    state: absent
+
+- name: Remove file (delete file) - /etc/init.d/redis
+  file:
+    path: /etc/init.d/redis
+    state: absent
+
+- name: Ensure group "redis" exists
+  group:
+    name: redis
+    state: present
+
+- name: Add "redis" user
+  user:
+    name: redis
+    group: redis
+    createhome: no
+    system: yes
+
+- name: Create a directory /var/lib/redis directory which will store the redis databases
+  file:
+    path: '{{  redisdatabasepath  }}'
+    state: directory
+    mode: '0770'
+    owner: redis
+    
+- name: Create a directory  for Redis
+  file:
+    path: '{{  redispath  }}'
+    state: directory
+    mode: '0770'
+    owner: redis
+
+- name: Create a directory /etc/redis directory which will store the redis configs
+  file:
+    path:  '{{  redisconfigpath  }}'
+    state: directory
+    mode: '0770'
+    owner: redis
+
+- name: Create a directory download 
+  file:
+    path: '{{  redisdownload  }}'
+    state: directory
+    mode: '0770'
+    owner: redis
+
+- name: Create a directory for Redis
+  file:
+    path: /var/redis/6379
+    state: directory
+    mode: '0770'
+    owner: redis
+
+- name: Download Redis files {{  redis_version  }}
+  get_url:
+      url: https://{{ cdshare }}/puppet/redis/{{  redis_version  }}/{{ item }}
+      dest:  '{{  redisdownload  }}'
+      tmp_dest: /data/
+  with_items:
+        - '{{ redisfile }}'
+  tags: redisdownload
+  register: redisdownload
+  retries: 3
+  delay: 3
+  until: redisdownload is not failed
+
+- name: Unarchive Redis
+  unarchive:
+    src: /data/files/redis-{{  redis_version  }}.tar
+    dest: '{{  redispath  }}'
+    remote_src: yes
+
+- name: get ip for bind configs
+  shell: hostname --ip-address
+  args:
+    executable: /bin/bash
+  register: bind_ip
+
+- name: cop.comy config 
+  template:
+     src: templates/redis.conf
+     dest: '{{  redisconfigpath  }}/redis.conf'
+     force: yes
+     mode: '0640'
+  
+- name: cop.comy redis init.d 
+  template:
+     src: templates/redis_init_script
+     dest: /etc/init.d/redis
+     mode: '0755'
+
+
+- name: chkconfig --add redis
+  shell: chkconfig --add redis
+  args:
+    executable: /bin/bash
+
+- name: chkconfig --level 345 redis on
+  shell: chkconfig --level 345 redis on
+  args:
+    executable: /bin/bash
+
+- name: start Redis 
+  shell: /etc/init.d/redis start
+  args:
+    executable: /bin/bash
+
+- name: restart Redis 
+  shell: /etc/init.d/redis restart
+  args:
+    executable: /bin/bash
+
+
+
+- name: redis-cli --cluster create
+  shell: |
+    echo "yes" | /data/redis/redis-{{  redis_version  }}/bin/redis-cli -a  {{  AuthPassword.stdout  }} --cluster-replicas 1 --cluster create {% for node in groups['node'] %}{{ hostvars[node]['inventory_hostname']}}:6379 {% endfor %}
+  args:
+    executable: /bin/bash
+  register: master0
+  when:  inventory_hostname in groups ['node'][0]
+
+#Clean up
+
+- name: Recursively remove directory /data/files
+  file:
+    path: /data/files
+    state: absent
+
+- name: Recursively remove directory /data/redis/redis-6.0.8/utils
+  file:
+    path: /data/redis/redis-6.0.8/utils
+    state: absent
+
+- name: Recursively remove directory /data/redis/redis-6.0.8/src
+  file:
+    path: /data/redis/redis-6.0.8/src
+    state: absent
+
+    
+    

@@ -1,0 +1,6 @@
+---
+- name: Common deployment 
+  hosts: all 
+  gather_facts: false          
+  roles:
+    - common

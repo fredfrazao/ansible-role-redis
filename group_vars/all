@@ -1,0 +1,26 @@
+# The global variable file Redis installation
+
+# Redis Version to be installed 
+redis_version: '6.0.8'
+redis_port: '6379'
+
+# Redis Tar File 
+redisfile: redis-{{  redis_version  }}.tar
+
+# Create a directory /var/lib/redis directory which will store the redis databases
+redisdatabasepath: '/var/lib/redis'
+
+# directory /etc/redis directory which will store the redis configs
+redisconfigpath: '/etc/redis'
+
+# directory for download the binaries for installation 
+redisdownload: '/data/files/'
+
+# Redis Install Path
+redispath: '/data/redis'
+
+# Cd Share 
+cdshare: 'cd-share--nonprod.internal.org'
+
+vault_path: 'v1/kv2-secrets/kv/data/'
+vault_source: 'https://vault-nonprod.internal.org:8200/'
